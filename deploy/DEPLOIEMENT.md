@@ -1,5 +1,7 @@
 # Mettre le prototype en ligne sur un VPS (sous-domaine)
 
+> **Serveur sous Plesk ?** Suivez plutôt [DEPLOIEMENT-PLESK.md](DEPLOIEMENT-PLESK.md) : Plesk gère lui-même Nginx et les certificats.
+
 Le prototype est un **site statique** : `npm run build` produit un dossier `web/dist/` (HTML, CSS, JS).
 Sur le serveur, il suffit de **Nginx**. Node.js n'est nécessaire que pour construire le site.
 
@@ -99,7 +101,7 @@ sudo systemctl reload nginx
 ## 4. Option A (recommandée) : déploiement automatique depuis GitHub
 
 À chaque push sur la branche, GitHub Actions construit le site et le copie sur le VPS.
-Le workflow est déjà prêt dans le dépôt : [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
+Le workflow est déjà prêt dans le dépôt : [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml). La copie en SSH ne s'active que si le secret `VPS_HOST` existe.
 
 ### 4.1 Créer une clé SSH dédiée
 

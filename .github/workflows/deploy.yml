@@ -1,12 +1,10 @@
-# Construit le prototype (web/) et le copie sur le VPS à chaque push.
-# Secrets à créer dans GitHub > Settings > Secrets and variables > Actions :
-#   VPS_HOST         ip ou nom du serveur (ex. 203.0.113.10)
-#   VPS_USER         utilisateur SSH (ex. deploy)
-#   VPS_SSH_KEY      clé privée SSH (contenu complet du fichier)
-#   VPS_PATH         dossier servi par Nginx (ex. /var/www/checkhub)
-#   VPS_PORT         (facultatif) port SSH, 22 par défaut
-#   VPS_KNOWN_HOSTS  (facultatif, recommandé) sortie de `ssh-keyscan -p PORT HOST`
-name: Déploiement VPS
+# Construit le prototype (web/) à chaque push, puis :
+#  1. publie le site prêt à servir sur la branche `site` (récupérée par Plesk > Git) ;
+#  2. (facultatif) le copie aussi en SSH sur un serveur, si le secret VPS_HOST existe.
+#
+# Secrets facultatifs pour l'option SSH (GitHub > Settings > Secrets and variables > Actions) :
+#   VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PATH, VPS_PORT (22 par défaut), VPS_KNOWN_HOSTS
+name: Déploiement
 
 on:
   push:
@@ -14,13 +12,18 @@ on:
     paths: ['web/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
+permissions:
+  contents: write # nécessaire pour pousser la branche `site`
+
 concurrency:
-  group: deploy-vps
+  group: deploy
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
     defaults:
       run:
         working-directory: web
@@ -39,11 +42,25 @@ jobs:
       - name: Construire
         run: npm run build
 
+      - name: Publier sur la branche `site`
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          cd dist
+          git init -q -b site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Site construit depuis ${SOURCE_SHA}"
+          git push -f -q "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" site
+          echo "Branche site mise à jour depuis ${SOURCE_SHA}"
+
       - name: Préparer SSH
+        if: env.VPS_HOST != ''
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-          HOST: ${{ secrets.VPS_HOST }}
           PORT: ${{ secrets.VPS_PORT || '22' }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -52,15 +69,15 @@ jobs:
           if [ -n "$KNOWN_HOSTS" ]; then
             printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           else
-            ssh-keyscan -p "$PORT" "$HOST" > ~/.ssh/known_hosts
+            ssh-keyscan -p "$PORT" "$VPS_HOST" > ~/.ssh/known_hosts
           fi
 
-      - name: Copier sur le VPS
+      - name: Copier sur le serveur (SSH)
+        if: env.VPS_HOST != ''
         env:
-          HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
           PORT: ${{ secrets.VPS_PORT || '22' }}
           DEST: ${{ secrets.VPS_PATH }}
         run: |
           test -n "$DEST" || { echo "Secret VPS_PATH manquant"; exit 1; }
-          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy -p $PORT" dist/ "$USER@$HOST:$DEST/"
+          rsync -az --delete --exclude .git -e "ssh -i ~/.ssh/id_deploy -p $PORT" dist/ "$USER@$VPS_HOST:$DEST/"

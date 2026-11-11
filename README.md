@@ -8,7 +8,7 @@ Ce dépôt contient :
 |---|---|
 | [`docs/ANALYSE.md`](docs/ANALYSE.md) | Audit de l'application de test existante (fonctionnalités, problèmes relevés) et cahier des améliorations |
 | [`web/`](web/) | Prototype interactif (React + TypeScript + Vite), avec données de démonstration enregistrées dans le navigateur |
-| [`deploy/`](deploy/DEPLOIEMENT.md) | Mise en ligne sur un VPS (Nginx, sous-domaine, HTTPS) avec déploiement automatique par GitHub Actions |
+| [`deploy/`](deploy/DEPLOIEMENT-PLESK.md) | Mise en ligne : [Plesk](deploy/DEPLOIEMENT-PLESK.md) (yolo.werun.tn) ou [VPS sans Plesk](deploy/DEPLOIEMENT.md), avec déploiement automatique par GitHub Actions |
 
 ## Lancer le prototype
 
