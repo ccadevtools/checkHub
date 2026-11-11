@@ -1,0 +1,66 @@
+# Construit le prototype (web/) et le copie sur le VPS à chaque push.
+# Secrets à créer dans GitHub > Settings > Secrets and variables > Actions :
+#   VPS_HOST         ip ou nom du serveur (ex. 203.0.113.10)
+#   VPS_USER         utilisateur SSH (ex. deploy)
+#   VPS_SSH_KEY      clé privée SSH (contenu complet du fichier)
+#   VPS_PATH         dossier servi par Nginx (ex. /var/www/checkhub)
+#   VPS_PORT         (facultatif) port SSH, 22 par défaut
+#   VPS_KNOWN_HOSTS  (facultatif, recommandé) sortie de `ssh-keyscan -p PORT HOST`
+name: Déploiement VPS
+
+on:
+  push:
+    branches: [main, claude/elegant-maxwell-ih2pz3]
+    paths: ['web/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire
+        run: npm run build
+
+      - name: Préparer SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          HOST: ${{ secrets.VPS_HOST }}
+          PORT: ${{ secrets.VPS_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$PORT" "$HOST" > ~/.ssh/known_hosts
+          fi
+
+      - name: Copier sur le VPS
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+          PORT: ${{ secrets.VPS_PORT || '22' }}
+          DEST: ${{ secrets.VPS_PATH }}
+        run: |
+          test -n "$DEST" || { echo "Secret VPS_PATH manquant"; exit 1; }
+          rsync -az --delete -e "ssh -i ~/.ssh/id_deploy -p $PORT" dist/ "$USER@$HOST:$DEST/"
