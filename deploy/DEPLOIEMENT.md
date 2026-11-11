@@ -157,7 +157,7 @@ ssh-keyscan IP_DU_VPS
 ### 4.4 Lancer le déploiement
 
 - **Automatique** : à chaque push qui modifie `web/` sur `main` ou sur `claude/elegant-maxwell-ih2pz3`.
-- **Manuel** : sur GitHub, onglet **Actions → Déploiement VPS → Run workflow**.
+- **Manuel** : sur GitHub, onglet **Actions → Déploiement → Run workflow**.
 
 Une fois le workflow au vert, ouvrez https://checkhub.votredomaine.tn.
 
